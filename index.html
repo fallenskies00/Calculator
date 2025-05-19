@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>劳务费个税反推计算器</title>
+    <style>
+        * { box-sizing: border-box; margin:0; padding:0 }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f5f7fa;
+            color: #333;
+            padding: 2em;
+            max-width: 800px;
+            margin: auto;
+        }
+        .page-title {
+            font-size: 2rem;
+            font-weight: 500;
+            text-align: center;
+            margin: 1.5rem 0;
+        }
+        form {
+            background: #fff;
+            padding: 1.5em;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 2em;
+        }
+        form label {
+            display: block;
+            font-size: 1rem;
+            color: #555;
+            margin-bottom: 0.5em;
+        }
+        .input-wrapper {
+            position: relative;
+            margin-bottom: 1em;
+        }
+        .input-wrapper input::-webkit-inner-spin-button,
+        .input-wrapper input::-webkit-outer-spin-button {
+            -webkit-appearance: none; margin:0;
+        }
+        .input-wrapper input {
+            width: 100%;
+            padding: 0.8em;
+            padding-right: 2.5em;
+            font-size: 1rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        .input-wrapper .clear-icon {
+            position: absolute;
+            right: 0.5em;
+            top: 50%;
+            transform: translateY(-50%);
+            background: transparent;
+            border: none;
+            font-size: 1.2rem;
+            color: #999;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .input-wrapper .clear-icon:hover { color:#666 }
+        button.calc-btn {
+            width: 100%;
+            padding: 0.8em;
+            font-size: 1rem;
+            background: #4a90e2;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button.calc-btn:active { opacity:0.85 }
+        #resultArea { display:none; margin-bottom:2em }
+        .result-header {
+            text-align:center;
+            background:linear-gradient(to bottom,#4a90e2,#357abd);
+            color:#fff;
+            border-radius:8px;
+            padding:1.5em 1em;
+            margin-bottom:1em;
+        }
+        .result-header h2 { font-size:1.1rem; margin-bottom:0.5em }
+        .gross-income { font-size:3em; font-weight:bold }
+        .gross-label { font-size:0.9em; opacity:0.8; margin-top:0.3em }
+
+        .card {
+            display:flex;
+            background:#fff;
+            border-radius:8px;
+            box-shadow:0 2px 8px rgba(0,0,0,0.1);
+            overflow:hidden;
+            margin-bottom:1.5em;
+        }
+        .card-item {
+            flex:1;
+            text-align:center;
+            padding:1em;
+            border-right:1px solid #f0f0f0;
+        }
+        .card-item:last-child { border-right:none }
+        .card-title { font-size:0.9em; color:#666 }
+        .card-value { font-size:1.5em; margin-top:0.3em }
+        .net-income { color:#1E90FF }
+        .tax-amount { color:#FF8C00 }
+
+        .details-section { margin-bottom:2em }
+        .section-title {
+            font-size:1rem;
+            color:#333;
+            border-left:4px solid #4a90e2;
+            padding-left:0.5em;
+            margin-bottom:0.8em;
+        }
+        .formula-box {
+            background:#FFF4E5;
+            border-radius:4px;
+            padding:1em;
+            margin-bottom:1em;
+            font-size:0.95em;
+            color:#333;
+        }
+        .calc-list { list-style:none }
+        .calc-list li {
+            display:flex;
+            justify-content:space-between;
+            padding:0.6em 0;
+            border-bottom:1px solid #eee;
+            font-size:0.95em;
+        }
+        .calc-list li:last-child { border-bottom:none }
+    </style>
+</head>
+<body>
+
+<h1 class="page-title">个人劳务费税前反推</h1>
+
+<form id="calcForm" onsubmit="return false;">
+    <label for="netIncome">税后收入（元）</label>
+    <div class="input-wrapper">
+        <input type="number" id="netIncome" placeholder="请输入税后收入" min="0" step="0.01" required>
+        <button type="button" class="clear-icon" id="clearIcon" title="清空">✕</button>
+    </div>
+    <button type="button" class="calc-btn" id="calcBtn">计算税前收入</button>
+</form>
+
+<div id="resultArea">
+    <div class="result-header">
+        <h2>计算结果</h2>
+        <div id="grossValue" class="gross-income">0.00</div>
+        <div class="gross-label">税前收入（元）</div>
+    </div>
+
+    <div class="card">
+        <div class="card-item">
+            <div class="card-title">税后收入（元）</div>
+            <div id="netValue" class="card-value net-income">0.00</div>
+        </div>
+        <div class="card-item">
+            <div class="card-title">应纳个税（元）</div>
+            <div id="taxValue" class="card-value tax-amount">0.00</div>
+        </div>
+    </div>
+
+    <div class="details-section">
+        <div class="section-title">计算详情</div>
+        <div id="formulaText" class="formula-box"></div>
+        <ul id="calcList" class="calc-list"></ul>
+    </div>
+</div>
+
+<script>
+    const form       = document.getElementById("calcForm");
+    const resultArea = document.getElementById("resultArea");
+    const netInput   = document.getElementById("netIncome");
+
+    document.getElementById("calcBtn").onclick = () => {
+        const net = parseFloat(netInput.value);
+        if (isNaN(net) || net < 0) {
+            alert("请输入有效的税后收入");
+            return;
+        }
+
+        let gross, tax, detailSteps = [];
+
+        if (net <= 800) {
+            gross = net; tax = 0;
+            detailSteps.push({ label: "免税区间 (≤800)", value: "税前收入 = 税后收入" });
+        }
+        else if (net <= 3360) {
+            // tax = (gross-800)*0.2 => net = gross - tax = gross - 0.2*(gross-800) = 0.8*gross +160
+            gross = (net - 160) / 0.8; tax = gross - net;
+            detailSteps.push({ label: "计算公式", value: `税前 = (税后 - 160) ÷ 0.8 = (${net.toFixed(2)} - 160) ÷ 0.8 = ${gross.toFixed(2)}` });
+            detailSteps.push({ label: "个税", value: `${tax.toFixed(2)}` });
+        }
+        else if (net <= 21000) {
+            // tax = (gross*0.8)*0.2 => net = gross - 0.16*gross = 0.84*gross
+            gross = net / 0.84; tax = gross - net;
+            detailSteps.push({ label: "计算公式", value: `税前 = 税后 ÷ 0.84 = ${net.toFixed(2)} ÷ 0.84 = ${gross.toFixed(2)}` });
+            detailSteps.push({ label: "个税", value: `${tax.toFixed(2)}` });
+        }
+        else if (net <= 49500) {
+            // tax = gross*0.8*0.3 -2000 => net = gross - tax = gross - (0.24*gross -2000) = 0.76*gross+2000
+            gross = (net - 2000) / 0.76; tax = gross - net;
+            detailSteps.push({ label: "计算公式", value: `税前 = (税后 - 2000) ÷ 0.76 = (${net.toFixed(2)} - 2000) ÷ 0.76 = ${gross.toFixed(2)}` });
+            detailSteps.push({ label: "个税", value: `${tax.toFixed(2)}` });
+        }
+        else {
+            // tax = gross*0.8*0.4 -7000 => net = gross - (0.32*gross -7000) = 0.68*gross+7000
+            gross = (net - 7000) / 0.68; tax = gross - net;
+            detailSteps.push({ label: "计算公式", value: `税前 = (税后 - 7000) ÷ 0.68 = (${net.toFixed(2)} - 7000) ÷ 0.68 = ${gross.toFixed(2)}` });
+            detailSteps.push({ label: "个税", value: `${tax.toFixed(2)}` });
+        }
+
+        // 显示结果
+        document.getElementById("grossValue").textContent = gross.toFixed(2);
+        document.getElementById("netValue").textContent   = net.toFixed(2);
+        document.getElementById("taxValue").textContent   = tax.toFixed(2);
+
+        // 详情展示
+        document.getElementById("formulaText").textContent =
+            detailSteps[0].label.includes("免税") ? detailSteps[0].label : "计算步骤如下：";
+
+        const ul = document.getElementById("calcList");
+        ul.innerHTML = "";
+        detailSteps.forEach(item => {
+            const li = document.createElement("li");
+            li.innerHTML = `<span>${item.label}</span><span>${item.value}</span>`;
+            ul.appendChild(li);
+        });
+
+        resultArea.style.display = "block";
+    };
+
+    document.getElementById("clearIcon").onclick = () => {
+        form.reset();
+        resultArea.style.display = "none";
+        netInput.focus();
+    };
+</script>
+
+</body>
+</html>
